@@ -181,9 +181,7 @@ static volatile uint8_t fault_recovered = E_OK; /* flag to indicate if EVE_busy 
 void EVE_cmdWrite(uint8_t const command, uint8_t const parameter)
 {
     EVE_cs_set();
-    spi_transmit(command);
-    spi_transmit(parameter);
-    spi_transmit(0U);
+    EVE_host_command(command, parameter);
     EVE_cs_clear();
 }
 
@@ -194,8 +192,7 @@ uint8_t EVE_memRead8(uint32_t const ft_address)
 {
     uint8_t data;
     EVE_cs_set();
-    spi_transmit_32(((ft_address >> 16U) & 0x0000007fUL) + (ft_address & 0x0000ff00UL) + ((ft_address & 0x000000ffUL) << 16U));
-    data = spi_receive(0U); /* read data byte by sending another dummy byte */
+    data = spi_rd8(ft_address);
     EVE_cs_clear();
     return (data);
 }
@@ -208,10 +205,7 @@ uint16_t EVE_memRead16(uint32_t const ft_address)
     uint16_t data;
 
     EVE_cs_set();
-    spi_transmit_32(((ft_address >> 16U) & 0x0000007fUL) + (ft_address & 0x0000ff00UL) + ((ft_address & 0x000000ffUL) << 16U));
-    uint8_t const lowbyte = spi_receive(0U); /* read low byte */
-    uint8_t const hibyte = spi_receive(0U); /* read high byte */
-    data = ((uint16_t) hibyte * 256U) | lowbyte;
+    data = spi_rd16(ft_address);
     EVE_cs_clear();
     return (data);
 }
@@ -223,11 +217,7 @@ uint32_t EVE_memRead32(uint32_t const ft_address)
 {
     uint32_t data;
     EVE_cs_set();
-    spi_transmit_32(((ft_address >> 16U) & 0x0000007fUL) + (ft_address & 0x0000ff00UL) + ((ft_address & 0x000000ffUL) << 16U));
-    data = ((uint32_t) spi_receive(0U)); /* read low byte */
-    data = ((uint32_t) spi_receive(0U) << 8U) | data;
-    data = ((uint32_t) spi_receive(0U) << 16U) | data;
-    data = ((uint32_t) spi_receive(0U) << 24U) | data; /* read high byte */
+    data = spi_rd32(ft_address);
     EVE_cs_clear();
     return (data);
 }
@@ -238,10 +228,7 @@ uint32_t EVE_memRead32(uint32_t const ft_address)
 void EVE_memWrite8(uint32_t const ft_address, uint8_t const ft_data)
 {
     EVE_cs_set();
-    spi_transmit((uint8_t) (ft_address >> 16U) | MEM_WRITE);
-    spi_transmit((uint8_t) (ft_address >> 8U));
-    spi_transmit((uint8_t) (ft_address & 0x000000ffUL));
-    spi_transmit(ft_data);
+    spi_wr8(ft_address, ft_data);
     EVE_cs_clear();
 }
 
@@ -251,11 +238,7 @@ void EVE_memWrite8(uint32_t const ft_address, uint8_t const ft_data)
 void EVE_memWrite16(uint32_t const ft_address, uint16_t const ft_data)
 {
     EVE_cs_set();
-    spi_transmit((uint8_t) (ft_address >> 16U) | MEM_WRITE); /* send Memory Write plus high address byte */
-    spi_transmit((uint8_t) (ft_address >> 8U));              /* send middle address byte */
-    spi_transmit((uint8_t) (ft_address & 0x000000ffUL));     /* send low address byte */
-    spi_transmit((uint8_t) (ft_data & 0x00ffU));             /* send data low byte */
-    spi_transmit((uint8_t) (ft_data >> 8U));                 /* send data high byte */
+    spi_wr16(ft_address, ft_data);
     EVE_cs_clear();
 }
 
@@ -265,10 +248,7 @@ void EVE_memWrite16(uint32_t const ft_address, uint16_t const ft_data)
 void EVE_memWrite32(uint32_t const ft_address, uint32_t const ft_data)
 {
     EVE_cs_set();
-    spi_transmit((uint8_t) (ft_address >> 16U) | MEM_WRITE); /* send Memory Write plus high address byte */
-    spi_transmit((uint8_t) (ft_address >> 8U));              /* send middle address byte */
-    spi_transmit((uint8_t) (ft_address & 0x000000ffUL));     /* send low address byte */
-    spi_transmit_32(ft_data);
+    spi_wr32(ft_address, ft_data);
     EVE_cs_clear();
 }
 
@@ -447,9 +427,7 @@ void EVE_execute_cmd(void)
 static void eve_begin_cmd(uint32_t command)
 {
     EVE_cs_set();
-    spi_transmit((uint8_t) 0xB0U); /* high-byte of REG_CMDB_WRITE + MEM_WRITE */
-    spi_transmit((uint8_t) 0x25U); /* middle-byte of REG_CMDB_WRITE */
-    spi_transmit((uint8_t) 0x78U); /* low-byte of REG_CMDB_WRITE */
+    spi_wr32(REG_CMDB_WRITE, command);
     spi_transmit_32(command);
 }
 
@@ -1719,9 +1697,7 @@ void EVE_start_cmd_burst(void)
     EVE_dma_buffer_index = 1U;
 #else
     EVE_cs_set();
-    spi_transmit((uint8_t) 0xB0U); /* high-byte of REG_CMDB_WRITE + MEM_WRITE */
-    spi_transmit((uint8_t) 0x25U); /* middle-byte of REG_CMDB_WRITE */
-    spi_transmit((uint8_t) 0x78U); /* low-byte of REG_CMDB_WRITE */
+    EVE_start_burst();
 #endif
 }
 
